@@ -1,6 +1,28 @@
 # openshift-image-stream-example
 
+## Run Openshift
 [source,bash]
 ----
-oc create -f template.yaml
+oc cluster up
+----
+
+## Login as system:admin and give the right permission
+[source,bash]
+----
+oc login -u system:admin
+oc adm policy add-scc-to-user anyuid -z default -n myproject
+----
+
+## Create Openshift template
+[source,bash]
+----
+oc create -f template.yaml -n openshift
+----
+
+## Create app
+[source,bash]
+----
+oc create secret generic source-secret --from-file=ssh-privatekey=$HOME/.ssh/id_rsa -n myproject
+
+oc new-app --template=base-image-example --param=GIT_URL=ssh://git@github.com/luszczynski/openshift-image-stream-example.git -n myproject
 ----
