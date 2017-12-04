@@ -1,0 +1,392 @@
+apiVersion: v1
+kind: Template
+message: |-
+  Template mostrando o uso de base image
+metadata:
+  labels:
+      app: base-image-example
+  name: base-image-example
+  annotations:
+    description: |-
+       Template mostrando o uso de base image
+    iconClass: icon
+    openshift.io/display-name: Base Image
+    tags: base
+objects:
+
+# SSH private Key for cloning
+- apiVersion: v1
+  data:
+    ssh-privatekey: ${SSH_PRIVATE_KEY}
+  kind: Secret
+  metadata:
+    name: source-secret
+  type: kubernetes.io/ssh-auth
+
+# ImageStream for CentOS 7
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      app: base-image
+    name: centos
+  spec:
+    lookupPolicy:
+      local: false
+    tags:
+    - name: "7"
+      from:
+        kind: DockerImage
+        name: ${BASE_IMAGE}
+
+# Build Config da Base Image
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      build: httpd-base
+      app: httpd-base
+    name: httpd-base
+  spec:
+    failedBuildsHistoryLimit: 5
+    output:
+      to:
+        kind: ImageStreamTag
+        name: httpd-base:latest
+    source:
+      contextDir: httpd-base
+      git:
+        uri: ${GIT_URL}
+        ref: master
+      sourceSecret:
+        name: source-secret
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: ${IMAGE_STREAM_OUTPUT}
+      type: Docker
+    successfulBuildsHistoryLimit: 5
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+    - generic:
+        secret: ${GENERIC_WEBHOOK_SECRET}
+      type: Generic
+    - imageChange: {}
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      build: httpd-base
+      app: httpd-base
+    name: httpd-base
+  spec:
+    dockerImageRepository:
+    tags:
+    - name: latest
+
+# App A
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      build: app-a
+      app: app-a
+    name: app-a
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: app-a:latest
+    postCommit: {}
+    source:
+      contextDir: app-a
+      git:
+        uri: ${GIT_URL}
+        ref: master
+      sourceSecret:
+        name: source-secret
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: httpd-base:latest
+      type: Docker
+    successfulBuildsHistoryLimit: 5
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+    - generic:
+        secret: ${GENERIC_WEBHOOK_SECRET}
+      type: Generic
+    - imageChange: {}
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      build: app-a
+      app: app-a
+    name: app-a
+  spec:
+    dockerImageRepository:
+    tags:
+    - name: latest
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: app-a
+    name: app-a
+  spec:
+    replicas: 1
+    selector:
+      app: app-a
+      deploymentconfig: app-a
+    strategy:
+      activeDeadlineSeconds: 21600
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          app: app-a
+          deploymentconfig: app-a
+      spec:
+        containers:
+          image: app-a:latest
+          imagePullPolicy: Always
+          name: app-a
+          ports:
+          - containerPort: 80
+            protocol: TCP
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        terminationGracePeriodSeconds: 30
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - app-a
+        from:
+          kind: ImageStreamTag
+          name: app-a:latest
+      type: ImageChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: app-a
+    name: app-a
+  spec:
+    ports:
+    - name: 80-tcp
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      deploymentconfig: app-a
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: app-a
+  spec:
+    host: app-a-myproject.apps.127.0.0.1.nip.io
+    port:
+      targetPort: 80-tcp
+    to:
+      kind: Service
+      name: app-a
+      weight: 100
+    wildcardPolicy: None
+
+# App b
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: app-b
+      build: app-b
+    name: app-b
+  spec:
+    failedBuildsHistoryLimit: 5
+    output:
+      to:
+        kind: ImageStreamTag
+        name: app-b:latest
+    source:
+      contextDir: app-b
+      git:
+        uri: ${GIT_URL}
+        ref: master
+      sourceSecret:
+        name: source-secret
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: httpd-base:latest
+      type: Docker
+    successfulBuildsHistoryLimit: 5
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+    - generic:
+        secret: ${GENERIC_WEBHOOK_SECRET}
+      type: Generic
+    - imageChange: {}
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    annotations:
+    openshift.io/display-name: App B
+    labels:
+      build: app-b
+      app: app-b
+    name: app-b
+  spec:
+    dockerImageRepository:
+    tags:
+    - name: latest
+      annotations:
+      description: |-
+        Build and run App B applications on CentOS 7. For more information about using this builder image, including OpenShift considerations, see https://github.com/sclorg/s2i-php-container/blob/master/5.6/README.md.
+
+        WARNING: By selecting this tag, your application will automatically update to use the latest version of PHP available on OpenShift, including major versions updates.
+      iconClass: icon-php
+      openshift.io/display-name: App B (Latest)
+      openshift.io/provider-display-name: Red Hat, Inc.
+      sampleRepo: https://github.com/openshift/cakephp-ex.git
+      supports: php
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: app-b
+    name: app-b
+  spec:
+    replicas: 1
+    selector:
+      app: app-b
+      deploymentconfig: app-b
+    strategy:
+      activeDeadlineSeconds: 21600
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          app: app-b
+          deploymentconfig: app-b
+      spec:
+        containers:
+          image: app-b:latest
+          imagePullPolicy: Always
+          name: app-b
+          ports:
+          - containerPort: 80
+            protocol: TCP
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        terminationGracePeriodSeconds: 30
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - app-b
+        from:
+          kind: ImageStreamTag
+          name: app-b:latest
+      type: ImageChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: app-b
+    name: app-b
+  spec:
+    ports:
+    - name: 80-tcp
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      deploymentconfig: app-b
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: app-b
+  spec:
+    host: app-b-myproject.apps.127.0.0.1.nip.io
+    port:
+      targetPort: 80-tcp
+    to:
+      kind: Service
+      name: app-b
+      weight: 100
+    wildcardPolicy: None
+
+# Parametros do template
+parameters:
+- description: URL do Git
+  displayName: URL do Git
+  name: GIT_URL
+  required: true
+  value: "ssh://git@github.com/luszczynski/openshift-image-stream-example.git"
+- description: SSH Private Key
+  displayName: SSH Private Key
+  name: SSH_PRIVATE_KEY
+  required: true
+- description: Base image path for building app
+  displayName: Base image
+  name: BASE_IMAGE
+  required: true
+  value: library/centos:7
+- description: Image stream output after building base image
+  displayName: Image stream output
+  name: IMAGE_STREAM_OUTPUT
+  required: true
+  value: centos:7
+- description: Github trigger secret.  A difficult to guess string encoded as part
+    of the webhook URL.  Not encrypted.
+  displayName: GitHub Webhook Secret
+  from: '[a-zA-Z0-9]{40}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+- description: A secret string used to configure the Generic webhook.
+  displayName: Generic Webhook Secret
+  from: '[a-zA-Z0-9]{40}'
+  generate: expression
+  name: GENERIC_WEBHOOK_SECRET
