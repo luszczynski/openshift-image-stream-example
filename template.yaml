@@ -355,7 +355,7 @@ parameters:
   displayName: URL do Git
   name: GIT_URL
   required: true
-  value: "ssh://git@github.com/luszczynski/openshift-image-stream-example.git"
+  value: "https://github.com/luszczynski/openshift-image-stream-example.git"
 - description: Base image path for building app
   displayName: Base image
   name: BASE_IMAGE

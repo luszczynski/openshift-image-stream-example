@@ -22,7 +22,8 @@ oc create -f template.yaml -n openshift
 ## Create app
 [source,bash]
 ----
+# If using ssh git clone
 oc create secret generic source-secret --from-file=ssh-privatekey=$HOME/.ssh/id_rsa -n myproject
 
-oc new-app --template=base-image-example --param=GIT_URL=ssh://git@github.com/luszczynski/openshift-image-stream-example.git -n myproject
+oc new-app --template=base-image-example --param=GIT_URL=https://github.com/luszczynski/openshift-image-stream-example.git -n myproject
 ----
