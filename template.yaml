@@ -49,8 +49,6 @@ objects:
       git:
         uri: ${GIT_URL}
         ref: master
-      sourceSecret:
-        name: source-secret
       type: Git
     strategy:
       dockerStrategy:
@@ -100,8 +98,6 @@ objects:
       git:
         uri: ${GIT_URL}
         ref: master
-      sourceSecret:
-        name: source-secret
       type: Git
     strategy:
       dockerStrategy:
@@ -228,8 +224,6 @@ objects:
       git:
         uri: ${GIT_URL}
         ref: master
-      sourceSecret:
-        name: source-secret
       type: Git
     strategy:
       dockerStrategy:
