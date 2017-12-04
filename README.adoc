@@ -1,0 +1,6 @@
+# openshift-image-stream-example
+
+[source,bash]
+----
+oc create -f template.yaml
+----
