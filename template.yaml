@@ -196,7 +196,7 @@ objects:
   metadata:
     name: app-a
   spec:
-    host: app-a-myproject.apps.127.0.0.1.nip.io
+    host:
     port:
       targetPort: 80-tcp
     to:
@@ -334,7 +334,7 @@ objects:
   metadata:
     name: app-b
   spec:
-    host: app-b-myproject.apps.127.0.0.1.nip.io
+    host: 
     port:
       targetPort: 80-tcp
     to:
